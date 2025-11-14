@@ -1,34 +1,47 @@
 import { useEffect, useState } from "react";
 
-function DataList() {
+function DataList({ onSelectRow }) {
   const [data, setData] = useState([]);
   const [loadingRow, setLoadingRow] = useState(null);
+  const [selectedRowId, setSelectedRowId] = useState(null);
 
   useEffect(() => {
     fetch("http://localhost:5000/api/data")
       .then((res) => res.json())
-      .then((data) => setData(data))
+      .then((data) => {
+        // 🟢 Add Policy ID dynamically
+        const dataWithPolicyId = data.map((item, index) => ({
+          ...item,
+          policyId: `${index + 1}`,
+        }));
+        setData(dataWithPolicyId);
+      })
       .catch((err) => console.error("Error fetching data:", err));
   }, []);
 
-  // Function to push a specific row’s data to backend
   const handlePush = async (item) => {
     try {
       setLoadingRow(item.metadata.u_change_id);
+
       const res = await fetch("http://localhost:5000/api/push-firewall", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(item), // send full row data
+        body: JSON.stringify(item),
       });
 
       const result = await res.json();
-      alert(result.message || "Policy pushed successfully!");
+      alert(result.message || `Policy ${item.policyId} pushed successfully!`);
     } catch (error) {
       console.error("Error pushing to firewall:", error);
       alert("Failed to push policy.");
     } finally {
       setLoadingRow(null);
     }
+  };
+
+  const handleRowSelect = (item) => {
+    setSelectedRowId(item.metadata.u_change_id);
+    onSelectRow?.(item); // Send selected row data to parent (Dashboard)
   };
 
   return (
@@ -39,6 +52,9 @@ function DataList() {
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gradient-to-r from-blue-50 to-indigo-50">
                 <tr>
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                    Policy ID
+                  </th>
                   <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
                     Change ID
                   </th>
@@ -66,8 +82,16 @@ function DataList() {
                 {data.map((item, i) => (
                   <tr
                     key={i}
-                    className="hover:bg-blue-50 transition-colors duration-200"
+                    onClick={() => handleRowSelect(item)}
+                    className={`transition-colors duration-200 cursor-pointer ${
+                      selectedRowId === item.metadata.u_change_id
+                        ? "bg-blue-100"
+                        : "hover:bg-blue-50"
+                    }`}
                   >
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                      {item.policyId}
+                    </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                       {item.metadata.u_change_id}
                     </td>
@@ -88,7 +112,10 @@ function DataList() {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
                       <button
-                        onClick={() => handlePush(item)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handlePush(item);
+                        }}
                         disabled={loadingRow === item.metadata.u_change_id}
                         className={`px-4 py-2 text-sm font-semibold rounded-md ${
                           loadingRow === item.metadata.u_change_id

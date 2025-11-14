@@ -1,21 +1,24 @@
+// Dashboard.jsx
 import { Navbar } from "../components/navbar";
 import DataList from "../components/policytable";
-import ChatbotUI from "../components/ChatbotUI"; // 👈 Import chatbot
+import ChatbotUI from "../components/ChatbotUI";
+import { useState } from "react";
 
 function Dashboard() {
+  const [selectedRow, setSelectedRow] = useState(null);
+
   return (
     <div className="bg-gray-200 min-h-screen flex flex-col relative">
-      {/* Navbar */}
       <Navbar />
 
-      {/* Main Content */}
+      {/* Pass setter to table so it can set the selected row */}
       <div className="flex-1 p-4">
-        <DataList />
+        <DataList onSelectRow={setSelectedRow} />
       </div>
 
-      {/* 💬 Floating Chatbot (bottom-right corner) */}
+      {/* Floating Chatbot */}
       <div className="fixed bottom-6 right-6 z-50">
-        <ChatbotUI />
+        <ChatbotUI selectedMetadata={selectedRow} />
       </div>
     </div>
   );

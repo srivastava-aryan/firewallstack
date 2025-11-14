@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { Send } from "lucide-react";
 
-export default function ChatbotUI() {
+export default function ChatbotUI({ selectedMetadata }) {
   const [messages, setMessages] = useState([
     { sender: "bot", text: "Hi there 👋 How can I help you today?" },
   ]);
@@ -9,86 +9,135 @@ export default function ChatbotUI() {
   const [loading, setLoading] = useState(false);
   const chatEndRef = useRef(null);
 
-  const scrollToBottom = () => {
+  const scrollToBottom = () =>
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  };
-
   useEffect(scrollToBottom, [messages]);
 
   const handleSend = async () => {
     if (!input.trim()) return;
-
     const userMsg = { sender: "user", text: input };
     setMessages((prev) => [...prev, userMsg]);
     setInput("");
     setLoading(true);
 
     try {
-      // Send message to LangFlow backend
-      const res = await fetch("http://localhost:7860/api/v1/run/96a67384-95d2-4f7e-8d95-d53abb0976ce", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          input_value: input,
-        }),
-      });
+      const lowerInput = input.trim().toLowerCase();
 
-      // If the response is not OK, read body for diagnostics and show error
-      let data;
-      try {
-        data = await res.json();
-      } catch (jsonErr) {
-        // Could not parse JSON
-        console.error("LangFlow response not JSON", { status: res.status, statusText: res.statusText });
-        setMessages((prev) => [
-          ...prev,
-          { sender: "bot", text: `⚠️ LangFlow returned invalid JSON (status ${res.status})` },
-        ]);
+      // 🟢 FEATURE 1: PUSH command — chatbot-triggered firewall push
+      if (lowerInput.startsWith("push")) {
+        let policyId = null;
+
+        // Extract policy ID if mentioned (e.g. "push 101")
+        const match = lowerInput.match(/push\s+(\d+)/);
+        if (match) policyId = match[1];
+
+        let policyToPush = selectedMetadata
+          ? { ...selectedMetadata }
+          : null;
+
+        // Add or overwrite a policyId field
+        if (policyToPush && !policyToPush.policyId) {
+          policyToPush.policyId = Math.floor(Math.random() * 1000) + 1;
+        }
+
+        // If user typed "push <id>", use that id in payload
+        if (policyId && policyToPush) {
+          policyToPush.policyId = policyId;
+        }
+
+        if (!policyToPush) {
+          setMessages((prev) => [
+            ...prev,
+            {
+              sender: "bot",
+              text: "⚠️ Please select a policy row first or specify a policy ID like 'push 101'.",
+            },
+          ]);
+          return;
+        }
+
+        const res = await fetch("http://localhost:5000/api/push-firewall", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(policyToPush), // ✅ send clean payload
+        });
+
+        const data = await res.json();
+
+        if (data.success || res.ok) {
+          setMessages((prev) => [
+            ...prev,
+            {
+              sender: "bot",
+              text: `✅ Policy ${policyToPush.policyId} pushed successfully to the firewall.`,
+            },
+          ]);
+        } else {
+          setMessages((prev) => [
+            ...prev,
+            {
+              sender: "bot",
+              text: `❌ Failed to push policy: ${
+                data.error || "Unknown error"
+              }`,
+            },
+          ]);
+        }
         return;
       }
 
-      // Log the full response to browser console for debugging
-      console.debug("LangFlow response:", data);
-
-      // Try multiple common paths used by LangFlow / HF UI to find output text
-      const botReply =
-        // common simple field
-        data?.output_text ||
-        data?.output ||
-        data?.result ||
-        // some flows wrap outputs
-        data?.outputs?.[0]?.text ||
-        data?.outputs?.[0]?.data?.text ||
-        // original shape you used (kept for backward compat)
-        data?.outputs?.[0]?.outputs?.[0]?.results?.message?.text ||
-        // try message/result paths
-        data?.message ||
-        // lastly, if response contains nested strings, try to find first string value
-        (function findFirstString(obj) {
-          if (!obj || typeof obj !== "object") return undefined;
-          for (const k of Object.keys(obj)) {
-            const v = obj[k];
-            if (typeof v === "string" && v.trim()) return v;
-            if (typeof v === "object") {
-              const found = findFirstString(v);
-              if (found) return found;
-            }
-          }
-        })(data) || null;
-
-      if (!botReply) {
-        // Nothing matched — show helpful debug text in the chat (and keep console.debug)
+      // 🟢 FEATURE 2: Show branch diagram
+      if (
+        lowerInput.includes("show branch") &&
+        (lowerInput.includes("diagram") ||
+          lowerInput.includes("architecture") ||
+          lowerInput.includes("layout"))
+      ) {
         setMessages((prev) => [
           ...prev,
           {
             sender: "bot",
-            text: "I'm not sure about that. (no parsable text in LangFlow response — check console)",
+            text: "🖼️ Opening the branch diagram in a new tab for you...",
           },
         ]);
-      } else {
-        setMessages((prev) => [...prev, { sender: "bot", text: botReply }] );
+        window.open("/branch-diagram.jpeg", "_blank");
+        return;
       }
+
+      // 🧠 FEATURE 3: Normal LangFlow conversation
+      const payload = {
+        input_type: "chat",
+        output_type: "chat",
+        tweaks: {
+          "ChatInput-coCFf": {
+            input_value: input,
+          },
+        },
+        session_id: crypto.randomUUID(),
+      };
+
+      const res = await fetch(
+        "http://localhost:7860/api/v1/run/96a67384-95d2-4f7e-8d95-d53abb0976ce",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        }
+      );
+
+      const data = await res.json();
+
+      const botReply =
+        data?.outputs?.[0]?.outputs?.[0]?.results?.message?.text ||
+        data?.outputs?.[0]?.text ||
+        data?.output_text ||
+        data?.result ||
+        data?.message ||
+        "🤖 I'm not sure about that.";
+
+      setMessages((prev) => [...prev, { sender: "bot", text: botReply }]);
     } catch (err) {
+      console.error(err);
       setMessages((prev) => [
         ...prev,
         { sender: "bot", text: "⚠️ Something went wrong. Please try again." },
@@ -100,12 +149,10 @@ export default function ChatbotUI() {
 
   return (
     <div className="flex flex-col h-[500px] w-[400px] border border-gray-300 rounded-2xl shadow-md bg-white overflow-hidden">
-      {/* Header */}
       <div className="bg-blue-600 text-white p-3 text-center font-semibold">
-        FireBot🔥- Your Firewall Assistant
+        FireBot🔥 - Your Firewall Assistant
       </div>
 
-      {/* Messages Area */}
       <div className="flex-1 overflow-y-auto p-3 space-y-3">
         {messages.map((msg, idx) => (
           <div
@@ -135,7 +182,6 @@ export default function ChatbotUI() {
         <div ref={chatEndRef} />
       </div>
 
-      {/* Input Area */}
       <div className="flex items-center p-2 border-t bg-gray-50">
         <input
           type="text"
