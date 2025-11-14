@@ -34,7 +34,10 @@ app.get("/api/data", async (req, res) => {
 app.post("/api/push-firewall", async (req, res) => {
   try {
     const { metadata } = req.body; // Row data sent from frontend
-    console.log("Pushing to firewall via LangFlow:", metadata);
+    console.log("Incoming body from frontend:", req.body);
+
+    const refinedMetadata = metadata;
+    console.log("Pushing to firewall via LangFlow:", refinedMetadata);
 
     // LangFlow endpoint
     const LANGFLOW_URL = process.env.LANGFLOW_URL;
@@ -51,16 +54,17 @@ app.post("/api/push-firewall", async (req, res) => {
       input_type: "chat",
       output_type: "text",
       tweaks: {
-        // This should match your entry ChatInput node ID (adjust if different)
-        "ChatInput-N97zd": {
+        // ✅ Send data to ChatInput node (this node passes it to the Firewall API Generator)
+        "ChatInput-Gksmq": {
           input_value: JSON.stringify({
-            metadata_json: metadata,
+            metadata_json: refinedMetadata,
             push_to_firewall: true,
           }),
         },
       },
       session_id: crypto.randomUUID(),
     };
+    console.log("Payload to LangFlow:", payload);
 
     // Send POST request to LangFlow
     const response = await axios.post(LANGFLOW_URL, payload, {
