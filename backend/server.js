@@ -7,7 +7,10 @@ import axios from "axios";
 dotenv.config();
 
 const app = express();
-app.use(cors());
+app.use(cors({
+  origin: "https://delightful-hill-0f440ed00.3.azurestaticapps.net",
+  methods: ["GET", "POST"],
+}));
 app.use(express.json());
 
 const client = new DataAPIClient(process.env.ASTRA_DB_APPLICATION_TOKEN);

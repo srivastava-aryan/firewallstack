@@ -56,7 +56,7 @@ export default function ChatbotUI({ selectedMetadata }) {
           return;
         }
 
-        const res = await fetch("http://localhost:5000/api/push-firewall", {
+        const res = await fetch("http://firebott-app-eubrcqh0b5dta3ax.centralindia-01.azurewebsites.net/api/push-firewall", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(policyToPush), // ✅ send clean payload
