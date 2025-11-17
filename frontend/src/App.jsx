@@ -2,7 +2,7 @@ import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Login from './pages/login';
 import Dashboard from './pages/dashboard';
-import ProtectedRoute from './utils/ProtectedRoute';
+import ProtectedRoute from './utils/ProtectedRoutes';
 
 export default function App() {
   return (
