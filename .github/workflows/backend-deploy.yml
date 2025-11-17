@@ -13,14 +13,22 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
+      # Install backend dependencies
       - name: Install Backend Dependencies
         run: |
           cd backend
-          npm install
+          npm install --production
 
+      # ZIP only the backend folder
+      - name: Create ZIP package for backend
+        run: |
+          cd backend
+          zip -r ../backend.zip .
+
+      # Deploy the ZIP to Azure App Service
       - name: Deploy to Azure Web App
-        uses: azure/webapps-deploy@v2
+        uses: azure/webapps-deploy@v3
         with:
           app-name: firebott-app
           publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE }}
-          package: backend
+          package: backend.zip
