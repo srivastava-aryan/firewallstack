@@ -18,14 +18,14 @@ function Navbar() {
   };
 
   useEffect(() => {
-    const getToken = localStorage.getItem(import.meta.env.VITE_TOKEN_NAME);
+    const getToken = localStorage.getItem("token");
     if (!getToken) {
       navigate("/login");
     }
   }, []);
 
   const handleLogout = () => {
-    localStorage.removeItem(import.meta.env.VITE_TOKEN_NAME);
+    localStorage.removeItem("token");
     window.location.reload();
   }
 

@@ -13,11 +13,11 @@ function Login() {
       alert("Please enter both username and password.");
       return;
     }
-    if(username !== import.meta.env.VITE_ADMIN || password !== import.meta.env.VITE_PASSWORD) {
+    if(username !== "admin" || password !== "password") {
       alert("Invalid username or password.");
       return;
     }
-    localStorage.setItem(import.meta.env.VITE_TOKEN_NAME, 'true');
+    localStorage.setItem("token", 'true');
     navigate("/dashboard");
     // console.log({ username, password, rememberMe });
   };
