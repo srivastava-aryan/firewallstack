@@ -71,7 +71,7 @@ function Navbar() {
         <div className="ml-auto flex items-center space-x-4">
           <button
           onClick={handleLogout}
-            className="p-2 text-gray-300 hover:text-white hover:bg-gray-700 rounded-lg transition-all duration-200 group"
+            className="p-2 text-gray-300 hover:text-white hover:bg-gray-600 rounded-lg transition-all duration-200 group"
             aria-label="Notifications"
           >
             Logout
