@@ -1,7 +1,10 @@
-import { useState } from 'react';
+import { useEffect } from "react";
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 
 function Navbar() {
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const navigate = useNavigate();
 
   const handleRefresh = () => {
     setIsRefreshing(true);
@@ -9,11 +12,22 @@ function Navbar() {
     const db = window.localStorage;
     db.setItem("id", " ");
 
-
     setTimeout(() => {
       setIsRefreshing(false);
     }, 1000);
   };
+
+  useEffect(() => {
+    const getToken = localStorage.getItem(import.meta.env.VITE_TOKEN_NAME);
+    if (!getToken) {
+      navigate("/login");
+    }
+  }, []);
+
+  const handleLogout = () => {
+    localStorage.removeItem(import.meta.env.VITE_TOKEN_NAME);
+    window.location.reload();
+  }
 
   return (
     <nav className="bg-gradient-to-r from-gray-800 to-gray-900 shadow-lg border-b border-gray-700">
@@ -55,6 +69,13 @@ function Navbar() {
 
         {/* Right Side Actions */}
         <div className="ml-auto flex items-center space-x-4">
+          <button
+          onClick={handleLogout}
+            className="p-2 text-gray-300 hover:text-white hover:bg-gray-700 rounded-lg transition-all duration-200 group"
+            aria-label="Notifications"
+          >
+            Logout
+          </button>
           {/* Refresh Button */}
           <button
             onClick={handleRefresh}
@@ -67,7 +88,7 @@ function Navbar() {
               viewBox="0 0 24 24"
               strokeWidth={2}
               stroke="currentColor"
-              className={`w-5 h-5 ${isRefreshing ? 'animate-spin' : ''}`}
+              className={`w-5 h-5 ${isRefreshing ? "animate-spin" : ""}`}
             >
               <path
                 strokeLinecap="round"

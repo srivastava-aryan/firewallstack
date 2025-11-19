@@ -1,14 +1,25 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 function Login() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [rememberMe, setRememberMe] = useState(false);
+  const navigate = useNavigate();
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    // Add your login logic here
-    console.log({ username, password, rememberMe });
+    if(!username || !password) {
+      alert("Please enter both username and password.");
+      return;
+    }
+    if(username !== import.meta.env.VITE_ADMIN || password !== import.meta.env.VITE_PASSWORD) {
+      alert("Invalid username or password.");
+      return;
+    }
+    localStorage.setItem(import.meta.env.VITE_TOKEN_NAME, 'true');
+    navigate("/dashboard");
+    // console.log({ username, password, rememberMe });
   };
 
   return (
