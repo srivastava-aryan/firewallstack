@@ -309,7 +309,7 @@ Action: ${policy.metadata?.u_action || "N/A"}
         };
 
         const res = await fetch(
-          "http://57.159.30.42:7860/api/v1/run/61f62131-47b9-41f8-bbfc-bea788b30374",
+          "https://57.159.30.42:7860/api/v1/run/61f62131-47b9-41f8-bbfc-bea788b30374",
           {
             method: "POST",
             headers: {
@@ -349,7 +349,7 @@ Action: ${policy.metadata?.u_action || "N/A"}
       };
 
       const res = await fetch(
-        "http://57.159.30.42:7860/api/v1/run/36d3864c-5d59-40be-be01-a42dd39e1ec1",
+        "https://57.159.30.42:7860/api/v1/run/36d3864c-5d59-40be-be01-a42dd39e1ec1",
         {
           method: "POST",
           headers: { "Content-Type": "application/json", "x-api-key": import.meta.env.VITE_YOUR_LANGFLOW_API_KEY },
