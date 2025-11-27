@@ -11,7 +11,7 @@ const app = express();
 app.use(
   cors({
     origin: [
-      // "https://delightful-hill-0f440ed00.3.azurestaticapps.net",
+      "https://delightful-hill-0f440ed00.3.azurestaticapps.net",
       "http://localhost:5173",
     ],
     methods: ["GET", "POST"],
