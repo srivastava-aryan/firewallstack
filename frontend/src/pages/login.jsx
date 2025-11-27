@@ -1,25 +1,61 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
+import { signInWithEmailAndPassword } from 'firebase/auth';
+import { auth } from '../firebase/config';
 
 function Login() {
-  const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [rememberMe, setRememberMe] = useState(false);
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    if(!username || !password) {
-      alert("Please enter both username and password.");
+    setError('');
+    setLoading(true);
+
+    if(!email || !password) {
+      setError("Please enter both email and password.");
+      setLoading(false);
       return;
     }
-    if(username !== "admin" || password !== "password") {
-      alert("Invalid username or password.");
-      return;
+
+    try {
+      // Sign in with Firebase
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      
+      console.log("User logged in:", userCredential.user);
+      
+      // Store token and user info
+      localStorage.setItem("token", 'true');
+      localStorage.setItem("userEmail", email);
+      
+      if (rememberMe) {
+        localStorage.setItem("rememberMe", 'true');
+      }
+      
+      // Navigate to dashboard
+      navigate("/dashboard");
+    } catch (err) {
+      console.error("Login error:", err);
+      
+      // Handle specific Firebase errors
+      if (err.code === 'auth/user-not-found') {
+        setError("No account found with this email.");
+      } else if (err.code === 'auth/wrong-password') {
+        setError("Incorrect password.");
+      } else if (err.code === 'auth/invalid-email') {
+        setError("Invalid email address.");
+      } else if (err.code === 'auth/invalid-credential') {
+        setError("Invalid email or password.");
+      } else {
+        setError("Failed to login. Please try again.");
+      }
+    } finally {
+      setLoading(false);
     }
-    localStorage.setItem("token", 'true');
-    navigate("/dashboard");
-    // console.log({ username, password, rememberMe });
   };
 
   return (
@@ -47,8 +83,15 @@ function Login() {
             Login to your account
           </h2>
 
+          {/* Error Message */}
+          {error && (
+            <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-600 rounded-lg text-sm">
+              {error}
+            </div>
+          )}
+
           <form onSubmit={handleSubmit} className="space-y-4">
-            {/* Username Input */}
+            {/* Email Input */}
             <div>
               <div className="relative">
                 <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">
@@ -63,15 +106,15 @@ function Login() {
                     <path
                       strokeLinecap="round"
                       strokeLinejoin="round"
-                      d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z"
+                      d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75"
                     />
                   </svg>
                 </span>
                 <input
-                  type="text"
-                  placeholder="admin"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
+                  type="email"
+                  placeholder="your@email.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
                   className="w-full pl-12 pr-4 py-3 bg-white/80 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:border-transparent transition-all placeholder-gray-400"
                   required
                 />
@@ -122,12 +165,27 @@ function Login() {
 
               <button
                 type="submit"
-                className="px-8 py-2.5 bg-cyan-500 hover:bg-cyan-600 text-white font-medium rounded-lg transition-all duration-200 shadow-md hover:shadow-lg transform hover:-translate-y-0.5"
+                disabled={loading}
+                className={`px-8 py-2.5 font-medium rounded-lg transition-all duration-200 shadow-md hover:shadow-lg transform ${
+                  loading 
+                    ? 'bg-gray-400 cursor-not-allowed' 
+                    : 'bg-cyan-500 hover:bg-cyan-600 hover:-translate-y-0.5'
+                } text-white`}
               >
-                Login
+                {loading ? 'Logging in...' : 'Login'}
               </button>
             </div>
           </form>
+
+          {/* Register Link */}
+          <div className="mt-6 text-center">
+            <p className="text-sm text-gray-600">
+              Don't have an account?{' '}
+              <Link to="/register" className="text-cyan-600 hover:text-cyan-700 font-semibold">
+                Sign Up
+              </Link>
+            </p>
+          </div>
         </div>
 
         {/* Footer */}

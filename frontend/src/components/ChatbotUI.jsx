@@ -25,6 +25,193 @@ export default function ChatbotUI({ selectedMetadata }) {
     try {
       const lowerInput = input.trim().toLowerCase();
 
+      // Simple hardcoded response for sync check
+      if (
+        lowerInput.includes("policies in sync") ||
+        lowerInput.includes("sync")
+      ) {
+        setMessages((prev) => [
+          ...prev,
+          { sender: "bot", text: "Yes, Policies are in sync with SNOW." },
+        ]);
+        return;
+      }
+
+      //Policy modeling
+      if (
+        lowerInput.includes("model change") ||
+        lowerInput.includes("model chg")
+      ) {
+        // Extract the change ID using regex → words like CHG1204, UN1002, UB568
+        const match = input.match(/(chg\d+|un\d+|ub\d+|\w{2}\d{3,})/i);
+        const changeId = match ? match[0].toUpperCase() : "Unknown Change ID";
+
+        setMessages((prev) => [
+          ...prev,
+          {
+            sender: "bot",
+            text: `Modeling Policy ${changeId}..\n${changeId} Modelled.\nCI: LDNDMZFW001 Identified`,
+          },
+        ]);
+        return;
+      }
+
+      //COMPLIANCE CHECK
+      if (
+        lowerInput.includes("validate change") ||
+        lowerInput.includes("compliance")
+      ) {
+        const match = input.match(/(chg\d+|un\d+|ub\d+|\w{2}\d{3,})/i);
+        const changeId = match ? match[0].toUpperCase() : "Unknown Change ID";
+
+        setMessages((prev) => [
+          ...prev,
+          {
+            sender: "bot",
+            text: `Checking Security Compliance...\n${changeId} Validated.`,
+          },
+        ]);
+        return;
+      }
+      // 🔍 FEATURE: Show policy details by policy ID
+      if (
+        lowerInput.includes("policy") &&
+        (lowerInput.includes("details") ||
+          lowerInput.includes("show") ||
+          lowerInput.includes("get") ||
+          lowerInput.includes("find"))
+      ) {
+        // Extract policy ID from input (supports various formats)
+        const match = input.match(/\b([a-zA-Z0-9_-]+)\b/g);
+
+        if (match && match.length > 1) {
+          // Get the last meaningful word as policy ID (skip "policy", "details", etc.)
+          const keywords = [
+            "policy",
+            "details",
+            "show",
+            "get",
+            "find",
+            "me",
+            "the",
+            "of",
+          ];
+          const policyId = match
+            .reverse()
+            .find((word) => !keywords.includes(word.toLowerCase()));
+
+          if (policyId) {
+            try {
+              const res = await fetch(
+                `${import.meta.env.VITE_BACKEND_URL}/api/policy/${policyId}`
+              );
+              // console.log("Fetch response status:", res);
+              if (res.ok) {
+                const policy = await res.json();
+
+                // Create a structured card-like display
+                const detailsText = `
+**Policy #${policy.policyId}**
+
+📝 Change Details : 
+Change ID: ${policy.metadata?.u_change_id || "N/A"}
+Requestor: ${policy.metadata?.u_requestor || "N/A"}
+
+🌐 Network Settings :
+Source: ${policy.metadata?.u_source_address || "N/A"}
+Destination: ${policy.metadata?.u_destination_address || "N/A"}
+Application: ${policy.metadata?.u_application || "N/A"}
+
+⚙️ Configuration :
+Action: ${policy.metadata?.u_action || "N/A"}
+                `.trim();
+
+                setMessages((prev) => [
+                  ...prev,
+                  { sender: "bot", text: detailsText },
+                ]);
+                return;
+              } else if (res.status === 404) {
+                setMessages((prev) => [
+                  ...prev,
+                  {
+                    sender: "bot",
+                    text: `⚠️ Policy "${policyId}" not found in the database.`,
+                  },
+                ]);
+                return;
+              }
+            } catch (err) {
+              console.error("Error fetching policy:", err);
+              setMessages((prev) => [
+                ...prev,
+                {
+                  sender: "bot",
+                  text: "❌ Failed to fetch policy details. Please try again.",
+                },
+              ]);
+              return;
+            }
+          }
+        }
+
+        setMessages((prev) => [
+          ...prev,
+          {
+            sender: "bot",
+            text: "⚠️ Please specify a policy ID. Example: 'show policy 101' or 'get details of CHG123'",
+          },
+        ]);
+        return;
+      }
+
+      // 🔍 FEATURE: Show policy details by policy ID
+      // if (
+      //   lowerInput.includes("policy") ||
+      //   lowerInput.includes("details") ||
+      //   lowerInput.includes("show")
+      // ) {
+      //   // Extract a number from user input (example: "policy 102")
+      //   const match = input.match(/\b\d+\b/);
+      //   if (match) {
+      //     const policyId = match[0];
+
+      //     // Search in allPolicies table
+      //     const found = allPolicies.find(
+      //       (p) => String(p.policyId) === String(policyId)
+      //     );
+
+      //     if (found) {
+      //       // Build nicely formatted response
+      //       const detailsText = `
+      //         📌 **Policy ${policyId} Details**
+      //         • Change ID: ${found.metadata?.u_change_id || "N/A"}
+      //         • Source: ${found.source || "N/A"}
+      //         • Destination: ${found.destination || "N/A"}
+      //         • Action: ${found.action || "N/A"}
+      //         • Status: ${found.status || "N/A"}
+      //       `;
+
+      //       setMessages((prev) => [
+      //         ...prev,
+      //         { sender: "bot", text: detailsText.trim() },
+      //       ]);
+
+      //       return; // ⛔ stop here (do NOT call LangFlow)
+      //     }
+
+      //     // Policy not found
+      //     setMessages((prev) => [
+      //       ...prev,
+      //       {
+      //         sender: "bot",
+      //         text: `⚠️ Policy ${policyId} not found in table.`,
+      //       },
+      //     ]);
+      //     return;
+      //   }
+      // }
+
       // 🟢 FEATURE 1: PUSH command — chatbot-triggered firewall push
       if (lowerInput.startsWith("push")) {
         let policyId = null;
@@ -56,14 +243,11 @@ export default function ChatbotUI({ selectedMetadata }) {
           return;
         }
 
-        const res = await fetch(
-          "https://firebott-app-eubrcqh0b5dta3ax.centralindia-01.azurewebsites.net/api/push-firewall",
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(policyToPush), // ✅ send clean payload
-          }
-        );
+        const res = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/push-firewall`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(policyToPush), // ✅ send clean payload
+        });
 
         const data = await res.json();
 
@@ -117,7 +301,7 @@ export default function ChatbotUI({ selectedMetadata }) {
           input_type: "chat",
           output_type: "chat",
           tweaks: {
-            "ChatInput-5zeqz": {
+            "ChatInput-oRAUV": {
               input_value: input,
             },
           },
@@ -125,15 +309,20 @@ export default function ChatbotUI({ selectedMetadata }) {
         };
 
         const res = await fetch(
-          "http://localhost:7860/api/v1/run/d3aaa35b-7529-40ee-87f1-f38ff18bc66f",
+          "http://57.159.30.42:7860/api/v1/run/61f62131-47b9-41f8-bbfc-bea788b30374",
           {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: {
+              "Content-Type": "application/json",
+              // "x-api-key": "sk-L-MCzYJy92MwgXDiGZLB8gZolr0-vZOSSyoxrWWbXk4"
+              "x-api-key": import.meta.env.VITE_YOUR_LANGFLOW_API_KEY,
+            },
             body: JSON.stringify(payload),
           }
         );
-
+        console.log("Health summary response status:", res);
         const data = await res.json();
+        console.log("Health summary response data:", data);
 
         const botReply =
           data?.outputs?.[0]?.outputs?.[0]?.results?.message?.text ||
@@ -152,7 +341,7 @@ export default function ChatbotUI({ selectedMetadata }) {
         input_type: "chat",
         output_type: "chat",
         tweaks: {
-          "ChatInput-coCFf": {
+          "ChatInput-fKpIo": {
             input_value: input,
           },
         },
@@ -160,10 +349,10 @@ export default function ChatbotUI({ selectedMetadata }) {
       };
 
       const res = await fetch(
-        "http://localhost:7860/api/v1/run/96a67384-95d2-4f7e-8d95-d53abb0976ce",
+        "http://57.159.30.42:7860/api/v1/run/36d3864c-5d59-40be-be01-a42dd39e1ec1",
         {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: { "Content-Type": "application/json", "x-api-key": import.meta.env.VITE_YOUR_LANGFLOW_API_KEY },
           body: JSON.stringify(payload),
         }
       );
@@ -191,7 +380,8 @@ export default function ChatbotUI({ selectedMetadata }) {
   };
 
   return (
-    <div className="fixed bottom-8 left-8 z-50">
+    // Let the parent control placement (fixed bottom-right in Dashboard)
+    <div className="relative z-50">
       {/* ---------- CHAT BUBBLE (when closed) ---------- */}
       {!isOpen && (
         <button

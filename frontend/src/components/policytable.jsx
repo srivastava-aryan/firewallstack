@@ -6,7 +6,7 @@ function DataList({ onSelectRow }) {
   const [selectedRowId, setSelectedRowId] = useState(null);
 
   useEffect(() => {
-    fetch("https://firebott-app-eubrcqh0b5dta3ax.centralindia-01.azurewebsites.net/api/data")
+    fetch(`${import.meta.env.VITE_BACKEND_URL}/api/data`)
       .then((res) => res.json())
       .then((data) => {
         // 🟢 Add Policy ID dynamically
@@ -23,7 +23,7 @@ function DataList({ onSelectRow }) {
     try {
       setLoadingRow(item.metadata.u_change_id);
 
-      const res = await fetch("https://firebott-app-eubrcqh0b5dta3ax.centralindia-01.azurewebsites.net/api/push-firewall", {
+      const res = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/push-firewall`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(item),

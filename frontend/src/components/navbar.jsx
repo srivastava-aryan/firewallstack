@@ -1,10 +1,43 @@
-import { useEffect } from "react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { auth } from "../firebase/config";
+import { onAuthStateChanged, signOut } from "firebase/auth";
 
 function Navbar() {
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [user, setUser] = useState(null);
+  const [displayName, setDisplayName] = useState("");
+  const [initials, setInitials] = useState("U");
   const navigate = useNavigate();
+
+  useEffect(() => {
+    // Listen for auth state changes
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      if (currentUser) {
+        setUser(currentUser);
+
+        // Get display name from Firebase user
+        const fullName = currentUser.displayName || currentUser.email || "User";
+        setDisplayName(fullName);
+
+        // Generate initials
+        if (currentUser.displayName) {
+          const names = currentUser.displayName.split(" ");
+          const firstInitial = names[0]?.charAt(0).toUpperCase() || "";
+          const lastInitial = names[1]?.charAt(0).toUpperCase() || "";
+          setInitials(firstInitial + lastInitial);
+        } else {
+          // Use first letter of email if no display name
+          setInitials(currentUser.email?.charAt(0).toUpperCase() || "U");
+        }
+      } else {
+        navigate("/login");
+      }
+    });
+
+    // Cleanup subscription
+    return () => unsubscribe();
+  }, [navigate]);
 
   const handleRefresh = () => {
     setIsRefreshing(true);
@@ -17,17 +50,15 @@ function Navbar() {
     }, 1000);
   };
 
-  useEffect(() => {
-    const getToken = localStorage.getItem("token");
-    if (!getToken) {
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+      localStorage.removeItem("token");
       navigate("/login");
+    } catch (error) {
+      console.error("Logout error:", error);
     }
-  }, []);
-
-  const handleLogout = () => {
-    localStorage.removeItem("token");
-    window.location.reload();
-  }
+  };
 
   return (
     <nav className="bg-gradient-to-r from-gray-800 to-gray-900 shadow-lg border-b border-gray-700">
@@ -70,12 +101,13 @@ function Navbar() {
         {/* Right Side Actions */}
         <div className="ml-auto flex items-center space-x-4">
           <button
-          onClick={handleLogout}
-            className="p-2 text-gray-300 hover:text-white hover:bg-gray-600 rounded-lg transition-all duration-200 group"
-            aria-label="Notifications"
+            onClick={handleLogout}
+            className="px-4 py-2 text-gray-300 hover:text-white hover:bg-red-600 rounded-lg transition-all duration-200 text-sm font-medium"
+            aria-label="Logout"
           >
             Logout
           </button>
+
           {/* Refresh Button */}
           <button
             onClick={handleRefresh}
@@ -101,12 +133,12 @@ function Navbar() {
           {/* Divider */}
           <div className="h-8 w-px bg-gray-600"></div>
 
-          {/* Admin Section */}
+          {/* User Section */}
           <div className="flex items-center space-x-2">
             <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center">
-              <span className="text-white text-sm font-semibold">A</span>
+              <span className="text-white text-sm font-semibold">{initials}</span>
             </div>
-            <span className="text-white font-medium text-sm">Admin</span>
+            <span className="text-white font-medium text-sm">{displayName}</span>
           </div>
         </div>
       </div>

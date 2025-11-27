@@ -3,6 +3,7 @@ import cors from "cors";
 import dotenv from "dotenv";
 import { DataAPIClient } from "@datastax/astra-db-ts";
 import axios from "axios";
+import crypto from "crypto";
 
 dotenv.config();
 
@@ -10,7 +11,7 @@ const app = express();
 app.use(
   cors({
     origin: [
-      "https://delightful-hill-0f440ed00.3.azurestaticapps.net",
+      // "https://delightful-hill-0f440ed00.3.azurestaticapps.net",
       "http://localhost:5173",
     ],
     methods: ["GET", "POST"],
@@ -96,6 +97,37 @@ app.post("/api/push-firewall", async (req, res) => {
       error: "Failed to push data to firewall",
       details: error.message,
     });
+  }
+});
+
+app.get("/api/policy/:policyId", async (req, res) => {
+  try {
+    const { policyId } = req.params;
+
+    // Fetch all rows, add policyId the same way frontend does
+    const cursor = db.collection("service_requests").find();
+    const docs = await cursor.toArray();
+
+    const dataWithPolicyId = docs.map((item, index) => ({
+      ...item,
+      policyId: `${index + 1}`,
+    }));
+
+    // Find by the assigned policyId (string comparison)
+    const policy = dataWithPolicyId.find(
+      (p) => String(p.policyId) === String(policyId)
+    );
+
+    if (!policy) {
+      return res.status(404).json({
+        error: "Policy not found",
+        policyId,
+      });
+    }
+    res.json(policy);
+  } catch (err) {
+    console.error("Error fetching policy from Astra DB:", err);
+    res.status(500).json({ error: "Failed to fetch policy from Astra DB" });
   }
 });
 
