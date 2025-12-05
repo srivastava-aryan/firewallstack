@@ -64,7 +64,7 @@ app.post("/api/push-firewall", async (req, res) => {
       output_type: "text",
       tweaks: {
         // ✅ Send data to ChatInput node (this node passes it to the Firewall API Generator)
-        "ChatInput-Gksmq": {
+        "ChatInput-CyBhP": {
           input_value: JSON.stringify({
             metadata_json: refinedMetadata,
             push_to_firewall: true,
