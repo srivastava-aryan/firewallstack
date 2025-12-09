@@ -4,6 +4,9 @@ import dotenv from "dotenv";
 import { DataAPIClient } from "@datastax/astra-db-ts";
 import axios from "axios";
 import crypto from "crypto";
+import fs from"fs";
+import https from "https";
+
 
 dotenv.config();
 
@@ -18,6 +21,10 @@ app.use(
   })
 );
 app.use(express.json());
+const agent = new https.Agent({
+  ca: fs.readFileSync("./certs/nginx.crt")
+});
+
 
 const client = new DataAPIClient(process.env.ASTRA_DB_APPLICATION_TOKEN);
 const db = client.db(
@@ -77,6 +84,7 @@ app.post("/api/push-firewall", async (req, res) => {
 
     // Send POST request to LangFlow
     const response = await axios.post(LANGFLOW_URL, payload, {
+      httpsAgent: agent,
       headers: {
         "Content-Type": "application/json",
         "x-api-key": API_KEY,
