@@ -22,7 +22,7 @@ app.use(
 );
 app.use(express.json());
 const agent = new https.Agent({
-  ca: fs.readFileSync("./certs/nginx.crt")
+  ca: fs.readFileSync("./certs/selfsigned_nginx.crt")
 });
 
 
