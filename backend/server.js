@@ -108,6 +108,8 @@ app.post("/api/push-firewall", async (req, res) => {
   }
 });
 
+
+
 app.get("/api/policy/:policyId", async (req, res) => {
   try {
     const { policyId } = req.params;
@@ -136,6 +138,64 @@ app.get("/api/policy/:policyId", async (req, res) => {
   } catch (err) {
     console.error("Error fetching policy from Astra DB:", err);
     res.status(500).json({ error: "Failed to fetch policy from Astra DB" });
+  }
+});
+
+app.post("/api/health-summary", async (req, res) => {
+  try {
+    const { input } = req.body;
+
+    if (!input) {
+      return res.status(400).json({ error: "Input is required" });
+    }
+
+    const payload = {
+      input_type: "chat",
+      output_type: "chat",
+      tweaks: {
+        "ChatInput-oRAUV": {
+          input_value: input,
+        },
+      },
+      session_id: crypto.randomUUID(),
+    };
+
+    const HEALTH_LANGFLOW_URL = "https://57.159.30.42:8443/api/v1/run/61f62131-47b9-41f8-bbfc-bea788b30374";
+    const API_KEY = process.env.LANGFLOW_API_KEY;
+
+    if (!API_KEY) {
+      return res.status(400).json({ error: "LangFlow API Key not configured" });
+    }
+
+    const response = await axios.post(HEALTH_LANGFLOW_URL, payload, {
+      httpsAgent: agent,
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": API_KEY,
+      },
+    });
+
+    console.log("Health summary response:", response.data);
+
+    const botReply =
+      response.data?.outputs?.[0]?.outputs?.[0]?.results?.message?.text ||
+      response.data?.outputs?.[0]?.text ||
+      response.data?.output_text ||
+      response.data?.result ||
+      response.data?.message ||
+      "🤖 I'm not sure about that.";
+
+    res.json({
+      success: true,
+      message: botReply,
+    });
+  } catch (error) {
+    console.error("Error fetching health summary:", error);
+    res.status(500).json({
+      success: false,
+      error: "Failed to fetch health summary",
+      details: error.message,
+    });
   }
 });
 

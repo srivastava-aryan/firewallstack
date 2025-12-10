@@ -297,42 +297,24 @@ Action: ${policy.metadata?.u_action || "N/A"}
           lowerInput.includes("status") ||
           lowerInput.includes("report"))
       ) {
-        const payload = {
-          input_type: "chat",
-          output_type: "chat",
-          tweaks: {
-            "ChatInput-oRAUV": {
-              input_value: input,
-            },
+        const res = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/health-summary`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
           },
-          session_id: crypto.randomUUID(),
-        };
+          body: JSON.stringify({ input }),
+        });
 
-        const res = await fetch(
-          "https://57.159.30.42:8443/api/v1/run/61f62131-47b9-41f8-bbfc-bea788b30374",
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              // "x-api-key": "sk-L-MCzYJy92MwgXDiGZLB8gZolr0-vZOSSyoxrWWbXk4"
-              "x-api-key": import.meta.env.VITE_YOUR_LANGFLOW_API_KEY,
-            },
-            body: JSON.stringify(payload),
-          }
-        );
-        console.log("Health summary response status:", res);
         const data = await res.json();
-        console.log("Health summary response data:", data);
 
-        const botReply =
-          data?.outputs?.[0]?.outputs?.[0]?.results?.message?.text ||
-          data?.outputs?.[0]?.text ||
-          data?.output_text ||
-          data?.result ||
-          data?.message ||
-          "🤖 I'm not sure about that.";
-
-        setMessages((prev) => [...prev, { sender: "bot", text: botReply }]);
+        if (data.success) {
+          setMessages((prev) => [...prev, { sender: "bot", text: data.message }]);
+        } else {
+          setMessages((prev) => [
+            ...prev,
+            { sender: "bot", text: "❌ Failed to fetch health summary. Please try again." },
+          ]);
+        }
         return;
       }
 
