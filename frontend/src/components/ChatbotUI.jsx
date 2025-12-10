@@ -319,37 +319,24 @@ Action: ${policy.metadata?.u_action || "N/A"}
       }
 
       // 🧠 FEATURE 3: Normal LangFlow conversation
-      const payload = {
-        input_type: "chat",
-        output_type: "chat",
-        tweaks: {
-          "ChatInput-fKpIo": {
-            input_value: input,
-          },
+      const res = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/chat`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
         },
-        session_id: crypto.randomUUID(),
-      };
-
-      const res = await fetch(
-        "https://57.159.30.42:8443/api/v1/run/36d3864c-5d59-40be-be01-a42dd39e1ec1",
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json", "x-api-key": import.meta.env.VITE_YOUR_LANGFLOW_API_KEY },
-          body: JSON.stringify(payload),
-        }
-      );
+        body: JSON.stringify({ input }),
+      });
 
       const data = await res.json();
 
-      const botReply =
-        data?.outputs?.[0]?.outputs?.[0]?.results?.message?.text ||
-        data?.outputs?.[0]?.text ||
-        data?.output_text ||
-        data?.result ||
-        data?.message ||
-        "🤖 I'm not sure about that.";
-
-      setMessages((prev) => [...prev, { sender: "bot", text: botReply }]);
+      if (data.success) {
+        setMessages((prev) => [...prev, { sender: "bot", text: data.message }]);
+      } else {
+        setMessages((prev) => [
+          ...prev,
+          { sender: "bot", text: "⚠️ Something went wrong. Please try again." },
+        ]);
+      }
     } catch (err) {
       console.error(err);
       setMessages((prev) => [

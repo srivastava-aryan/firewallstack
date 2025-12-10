@@ -199,5 +199,62 @@ app.post("/api/health-summary", async (req, res) => {
   }
 });
 
+app.post("/api/chat", async (req, res) => {
+  try {
+    const { input } = req.body;
+
+    if (!input) {
+      return res.status(400).json({ error: "Input is required" });
+    }
+
+    const payload = {
+      input_type: "chat",
+      output_type: "chat",
+      tweaks: {
+        "ChatInput-fKpIo": {
+          input_value: input,
+        },
+      },
+      session_id: crypto.randomUUID(),
+    };
+
+    const CHAT_LANGFLOW_URL = "https://57.159.30.42:8443/api/v1/run/36d3864c-5d59-40be-be01-a42dd39e1ec1";
+    const API_KEY = process.env.LANGFLOW_API_KEY;
+
+    if (!API_KEY) {
+      return res.status(400).json({ error: "LangFlow API Key not configured" });
+    }
+    const response = await axios.post(CHAT_LANGFLOW_URL, payload, {
+      httpsAgent: agent,
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": API_KEY,
+      },
+    });
+
+    console.log("Chat response:", response.data);
+
+    const botReply =
+      response.data?.outputs?.[0]?.outputs?.[0]?.results?.message?.text ||
+      response.data?.outputs?.[0]?.text ||
+      response.data?.output_text ||
+      response.data?.result ||
+      response.data?.message ||
+      "🤖 I'm not sure about that.";
+
+    res.json({
+      success: true,
+      message: botReply,
+    });
+  } catch (error) {
+    console.error("Error in chat:", error);
+    res.status(500).json({
+      success: false,
+      error: "Failed to process chat",
+      details: error.message,
+    });
+  }
+});
+
 const PORT = process.env.PORT;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
