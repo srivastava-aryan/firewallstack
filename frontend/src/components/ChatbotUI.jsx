@@ -25,17 +25,88 @@ export default function ChatbotUI({ selectedMetadata }) {
     try {
       const lowerInput = input.trim().toLowerCase();
 
-      // Simple hardcoded response for sync check
+      // 🔄 CHECK AND SYNC POLICIES
       if (
         lowerInput.includes("policies in sync") ||
-        lowerInput.includes("sync")
+        lowerInput.includes("sync policies") ||
+        lowerInput.includes("are the policies in sync")
       ) {
+        // Show initial status
         setMessages((prev) => [
           ...prev,
-          { sender: "bot", text: "Yes, Policies are in sync with SNOW." },
+          {
+            sender: "bot",
+            text: "🔄 Checking ServiceNow for policy updates...",
+          },
         ]);
+
+        // Small delay for UX
+        await new Promise((resolve) => setTimeout(resolve, 500));
+
+        setMessages((prev) => [
+          ...prev,
+          { sender: "bot", text: "📡 Connecting to ServiceNow..." },
+        ]);
+
+        await new Promise((resolve) => setTimeout(resolve, 500));
+
+        setMessages((prev) => [
+          ...prev,
+          { sender: "bot", text: "🔍 Fetching latest policies..." },
+        ]);
+
+        // Call the sync API
+        const res = await fetch(
+          `${import.meta.env.VITE_BACKEND_URL}/api/sync-servicenow`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+          }
+        );
+
+        const data = await res.json();
+
+        await new Promise((resolve) => setTimeout(resolve, 500));
+
+        setMessages((prev) => [
+          ...prev,
+          { sender: "bot", text: "⚙️ Processing records..." },
+        ]);
+
+        await new Promise((resolve) => setTimeout(resolve, 500));
+
+        if (data.success) {
+          // Final success message
+          setMessages((prev) => [
+            ...prev,
+            { sender: "bot", text: data.message },
+          ]);
+        } else {
+          setMessages((prev) => [
+            ...prev,
+            {
+              sender: "bot",
+              text:
+                data.message || "❌ Failed to sync policies. Please try again.",
+            },
+          ]);
+        }
         return;
       }
+
+      // Simple hardcoded response for sync check
+      // if (
+      //   lowerInput.includes("policies in sync") ||
+      //   lowerInput.includes("sync")
+      // ) {
+      //   setMessages((prev) => [
+      //     ...prev,
+      //     { sender: "bot", text: "Yes, Policies are in sync with SNOW." },
+      //   ]);
+      //   return;
+      // }
 
       //Policy modeling
       if (
@@ -81,77 +152,69 @@ export default function ChatbotUI({ selectedMetadata }) {
           lowerInput.includes("get") ||
           lowerInput.includes("find"))
       ) {
-        // Extract policy ID from input (supports various formats)
-        const match = input.match(/\b([a-zA-Z0-9_-]+)\b/g);
+        // Extract policy ID - support both numbers and change IDs
+        const numberMatch = input.match(/\b(\d+)\b/);
+        const changeIdMatch = input.match(/\b(UN\d+|CHG\d+|UB\d+)\b/i);
+        
+        const policyId = numberMatch ? numberMatch[1] : (changeIdMatch ? changeIdMatch[1] : null);
 
-        if (match && match.length > 1) {
-          // Get the last meaningful word as policy ID (skip "policy", "details", etc.)
-          const keywords = [
-            "policy",
-            "details",
-            "show",
-            "get",
-            "find",
-            "me",
-            "the",
-            "of",
-          ];
-          const policyId = match
-            .reverse()
-            .find((word) => !keywords.includes(word.toLowerCase()));
+        if (policyId) {
+          try {
+            setMessages((prev) => [
+              ...prev,
+              { sender: "bot", text: `🔍 Searching for policy ${policyId}...` },
+            ]);
 
-          if (policyId) {
-            try {
-              const res = await fetch(
-                `${import.meta.env.VITE_BACKEND_URL}/api/policy/${policyId}`
-              );
-              // console.log("Fetch response status:", res);
-              if (res.ok) {
-                const policy = await res.json();
+            const res = await fetch(
+              `${import.meta.env.VITE_BACKEND_URL}/api/policy/${policyId}`
+            );
 
-                // Create a structured card-like display
-                const detailsText = `
-**Policy #${policy.policyId}**
+            if (res.ok) {
+              const policy = await res.json();
 
-📝 Change Details : 
-Change ID: ${policy.metadata?.u_change_id || "N/A"}
-Requestor: ${policy.metadata?.u_requestor || "N/A"}
+              // Create a structured card-like display
+              const detailsText = `
+📋 **Policy #${policy.policyId}**
 
-🌐 Network Settings :
-Source: ${policy.metadata?.u_source_address || "N/A"}
-Destination: ${policy.metadata?.u_destination_address || "N/A"}
-Application: ${policy.metadata?.u_application || "N/A"}
+📝 **Change Details:**
+• Change ID: ${policy.u_change_id || "N/A"}
+• Requestor: ${policy.u_requestor || "N/A"}
 
-⚙️ Configuration :
-Action: ${policy.metadata?.u_action || "N/A"}
-                `.trim();
+🌐 **Network Settings:**
+• Source: ${policy.u_source_address || "N/A"}
+• Destination: ${policy.u_destination_address || "N/A"}
+• Application: ${policy.u_application || "N/A"}
+• Service Port: ${policy.u_service_port || "N/A"}
 
-                setMessages((prev) => [
-                  ...prev,
-                  { sender: "bot", text: detailsText },
-                ]);
-                return;
-              } else if (res.status === 404) {
-                setMessages((prev) => [
-                  ...prev,
-                  {
-                    sender: "bot",
-                    text: `⚠️ Policy "${policyId}" not found in the database.`,
-                  },
-                ]);
-                return;
-              }
-            } catch (err) {
-              console.error("Error fetching policy:", err);
+⚙️ **Configuration:**
+• Action: ${policy.u_action || "N/A"}
+              `.trim();
+
+              setMessages((prev) => [
+                ...prev,
+                { sender: "bot", text: detailsText },
+              ]);
+              return;
+            } else if (res.status === 404) {
               setMessages((prev) => [
                 ...prev,
                 {
                   sender: "bot",
-                  text: "❌ Failed to fetch policy details. Please try again.",
+                  text: `⚠️ Policy "${policyId}" not found in the database.`,
                 },
               ]);
               return;
             }
+          } catch (err) {
+            console.error("Error fetching policy:", err);
+            setMessages((prev) => [
+              ...prev,
+              {
+                sender: "bot",
+                text: "❌ Failed to fetch policy details. Please try again.",
+              },
+            ]);
+            return;
           }
         }
 
@@ -159,7 +222,7 @@ Action: ${policy.metadata?.u_action || "N/A"}
           ...prev,
           {
             sender: "bot",
-            text: "⚠️ Please specify a policy ID. Example: 'show policy 101' or 'get details of CHG123'",
+            text: "⚠️ Please specify a policy ID. Example: 'show policy 1' or 'show policy UN0001161'",
           },
         ]);
         return;
@@ -243,11 +306,14 @@ Action: ${policy.metadata?.u_action || "N/A"}
           return;
         }
 
-        const res = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/push-firewall`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(policyToPush), // ✅ send clean payload
-        });
+        const res = await fetch(
+          `${import.meta.env.VITE_BACKEND_URL}/api/push-firewall`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(policyToPush), // ✅ send clean payload
+          }
+        );
 
         const data = await res.json();
 
@@ -297,22 +363,31 @@ Action: ${policy.metadata?.u_action || "N/A"}
           lowerInput.includes("status") ||
           lowerInput.includes("report"))
       ) {
-        const res = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/health-summary`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ input }),
-        });
+        const res = await fetch(
+          `${import.meta.env.VITE_BACKEND_URL}/api/health-summary`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ input }),
+          }
+        );
 
         const data = await res.json();
 
         if (data.success) {
-          setMessages((prev) => [...prev, { sender: "bot", text: data.message }]);
+          setMessages((prev) => [
+            ...prev,
+            { sender: "bot", text: data.message },
+          ]);
         } else {
           setMessages((prev) => [
             ...prev,
-            { sender: "bot", text: "❌ Failed to fetch health summary. Please try again." },
+            {
+              sender: "bot",
+              text: "❌ Failed to fetch health summary. Please try again.",
+            },
           ]);
         }
         return;

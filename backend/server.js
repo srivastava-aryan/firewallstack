@@ -34,7 +34,7 @@ const db = client.db(
 app.get("/api/data", async (req, res) => {
   try {
     // Get the cursor
-    const cursor = db.collection("service_requests").find();
+    const cursor = db.collection("servicenow").find();
 
     // Convert cursor to array
     const docs = await cursor.toArray();
@@ -49,11 +49,19 @@ app.get("/api/data", async (req, res) => {
 
 app.post("/api/push-firewall", async (req, res) => {
   try {
-    const { metadata } = req.body; // Row data sent from frontend
+    const data = req.body; // Row data sent from frontend
     console.log("Incoming body from frontend:", req.body);
 
-    const refinedMetadata = metadata;
-    console.log("Pushing to firewall via LangFlow:", refinedMetadata);
+    const refinedData = {
+      u_change_id: data.u_change_id,
+      u_service_port: data.u_service_port,
+      u_source_address: data.u_source_address,
+      u_application: data.u_application,
+      u_destination_address: data.u_destination_address,
+      u_action: data.u_action,
+      u_requestor: data.u_requestor,
+    };
+    console.log("Pushing to firewall via LangFlow:", refinedData);
 
     // LangFlow endpoint
     const LANGFLOW_URL = process.env.LANGFLOW_URL;
@@ -73,7 +81,7 @@ app.post("/api/push-firewall", async (req, res) => {
         // ✅ Send data to ChatInput node (this node passes it to the Firewall API Generator)
         "ChatInput-CyBhP": {
           input_value: JSON.stringify({
-            metadata_json: refinedMetadata,
+            metadata_json: refinedData,
             push_to_firewall: true,
           }),
         },
@@ -114,16 +122,36 @@ app.get("/api/policy/:policyId", async (req, res) => {
   try {
     const { policyId } = req.params;
 
-    // Fetch all rows, add policyId the same way frontend does
-    const cursor = db.collection("service_requests").find();
+    // Fetch all rows
+    const cursor = db.collection("servicenow").find();
     const docs = await cursor.toArray();
 
-    const dataWithPolicyId = docs.map((item, index) => ({
-      ...item,
+    // 🔹 Filter unique entries by u_change_id (keep latest)
+    const uniqueData = [];
+    const seen = new Map();
+
+    docs.forEach((item) => {
+      const changeId = item.u_change_id;
+      
+      if (!seen.has(changeId)) {
+        seen.set(changeId, item);
+        uniqueData.push(item);
+      } else {
+        const existingIndex = uniqueData.findIndex(
+          (i) => i.u_change_id === changeId
+        );
+        uniqueData[existingIndex] = item;
+        seen.set(changeId, item);
+      }
+    });
+
+    // 🔹 Add policyId
+    const dataWithPolicyId = uniqueData.map((item, index) => ({
       policyId: `${index + 1}`,
+      ...item,  // Spread the data at root level
     }));
 
-    // Find by the assigned policyId (string comparison)
+    // Find by the assigned policyId
     const policy = dataWithPolicyId.find(
       (p) => String(p.policyId) === String(policyId)
     );
@@ -134,6 +162,7 @@ app.get("/api/policy/:policyId", async (req, res) => {
         policyId,
       });
     }
+    
     res.json(policy);
   } catch (err) {
     console.error("Error fetching policy from Astra DB:", err);
@@ -251,6 +280,114 @@ app.post("/api/chat", async (req, res) => {
     res.status(500).json({
       success: false,
       error: "Failed to process chat",
+      details: error.message,
+    });
+  }
+});
+
+app.post("/api/sync-servicenow", async (req, res) => {
+  try {
+    console.log("Starting ServiceNow sync...");
+
+    // ServiceNow Configuration
+    const SERVICENOW_URL = process.env.SERVICENOW_URL;
+    const SERVICENOW_TOKEN = process.env.SERVICENOW_TOKEN;
+
+    if (!SERVICENOW_URL || !SERVICENOW_TOKEN) {
+      return res.status(400).json({ 
+        error: "ServiceNow credentials not configured" 
+      });
+    }
+
+    // Fetch data from ServiceNow with Basic Auth token
+    const serviceNowResponse = await axios.get(SERVICENOW_URL, {
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Basic ${SERVICENOW_TOKEN}`,
+      },
+    });
+
+    console.log("ServiceNow data fetched:", serviceNowResponse.data);
+
+    // Extract the records from ServiceNow response
+    const records = serviceNowResponse.data.result || [];
+
+    if (records.length === 0) {
+      return res.json({
+        success: true,
+        message: "No records to sync",
+        count: 0,
+      });
+    }
+
+    // 🔹 Filter required fields only
+    const filteredRecords = records.map((record) => ({
+      u_change_id: record.u_change_id || "",
+      u_service_port: record.u_service_port || "",
+      u_source_address: record.u_source_address || "",
+      u_application: record.u_application || "",
+      u_destination_address: record.u_destination_address || "",
+      u_action: record.u_action || "",
+      u_requestor: record.u_requestor || "",
+    }));
+
+    // 🔹 Remove duplicates - keep only unique u_change_id (latest entry)
+    const uniqueRecordsMap = new Map();
+    filteredRecords.forEach((record) => {
+      if (record.u_change_id) {
+        uniqueRecordsMap.set(record.u_change_id, record);
+      }
+    });
+
+    const uniqueRecords = Array.from(uniqueRecordsMap.values());
+
+    console.log(`Filtered ${uniqueRecords.length} unique records from ${records.length} total`);
+
+    // 🔹 Get existing u_change_ids from Astra DB to avoid duplicates
+    const collection = db.collection(process.env.ASTRA_DB_SECOND_COLLECTION);
+    const existingDocs = await collection.find({}).toArray();
+    const existingChangeIds = new Set(existingDocs.map(doc => doc.u_change_id));
+
+    // 🔹 Filter out records that already exist in DB
+    const newRecords = uniqueRecords.filter(
+      record => !existingChangeIds.has(record.u_change_id)
+    );
+
+    if (newRecords.length === 0) {
+      return res.json({
+        success: true,
+        message: "All records already exist in database",
+        count: 0,
+        totalFetched: records.length,
+        uniqueRecords: uniqueRecords.length,
+      });
+    }
+
+    // 🔹 Add synced_at timestamp
+    const recordsToInsert = newRecords.map(record => ({
+      ...record,
+      synced_at: new Date().toISOString(),
+    }));
+
+    // 🔹 Insert only new unique documents
+    const insertResult = await collection.insertMany(recordsToInsert);
+
+    console.log("Data synced to Astra DB:", insertResult);
+
+    res.json({
+      success: true,
+      message: "ServiceNow data synced successfully",
+      totalFetched: records.length,
+      uniqueRecords: uniqueRecords.length,
+      newRecordsInserted: newRecords.length,
+      insertedIds: insertResult.insertedIds,
+    });
+
+  } catch (error) {
+    console.error("Error syncing ServiceNow data:", error);
+    res.status(500).json({
+      success: false,
+      error: "Failed to sync ServiceNow data",
       details: error.message,
     });
   }

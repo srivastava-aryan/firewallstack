@@ -9,11 +9,35 @@ function DataList({ onSelectRow }) {
     fetch(`${import.meta.env.VITE_BACKEND_URL}/api/data`)
       .then((res) => res.json())
       .then((data) => {
+        // 🟢 Filter unique entries by u_change_id (keep latest)
+        const uniqueData = [];
+        const seen = new Map();
+
+        // Iterate through data and keep track of latest entry for each u_change_id
+        data.forEach((item) => {
+          const changeId = item.u_change_id;
+
+          if (!seen.has(changeId)) {
+            seen.set(changeId, item);
+            uniqueData.push(item);
+          } else {
+            // If this item is newer, replace the existing one
+            const existingItem = seen.get(changeId);
+            // Compare timestamps or use array order (later = newer)
+            const existingIndex = uniqueData.findIndex(
+              (i) => i.u_change_id === changeId
+            );
+            uniqueData[existingIndex] = item;
+            seen.set(changeId, item);
+          }
+        });
+
         // 🟢 Add Policy ID dynamically
-        const dataWithPolicyId = data.map((item, index) => ({
+        const dataWithPolicyId = uniqueData.map((item, index) => ({
           ...item,
           policyId: `${index + 1}`,
         }));
+
         setData(dataWithPolicyId);
       })
       .catch((err) => console.error("Error fetching data:", err));
@@ -21,13 +45,16 @@ function DataList({ onSelectRow }) {
 
   const handlePush = async (item) => {
     try {
-      setLoadingRow(item.metadata.u_change_id);
+      setLoadingRow(item.u_change_id);
 
-      const res = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/push-firewall`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(item),
-      });
+      const res = await fetch(
+        `${import.meta.env.VITE_BACKEND_URL}/api/push-firewall`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(item),
+        }
+      );
 
       const result = await res.json();
       alert(result.message || `Policy ${item.policyId} pushed successfully!`);
@@ -40,7 +67,7 @@ function DataList({ onSelectRow }) {
   };
 
   const handleRowSelect = (item) => {
-    setSelectedRowId(item.metadata.u_change_id);
+    setSelectedRowId(item.u_change_id);
     onSelectRow?.(item); // Send selected row data to parent (Dashboard)
   };
 
@@ -84,7 +111,7 @@ function DataList({ onSelectRow }) {
                     key={i}
                     onClick={() => handleRowSelect(item)}
                     className={`transition-colors duration-200 cursor-pointer ${
-                      selectedRowId === item.metadata.u_change_id
+                      selectedRowId === item.u_change_id
                         ? "bg-blue-100"
                         : "hover:bg-blue-50"
                     }`}
@@ -93,22 +120,22 @@ function DataList({ onSelectRow }) {
                       {item.policyId}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                      {item.metadata.u_change_id}
+                      {item.u_change_id}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
-                      {item.metadata.u_application}
+                      {item.u_application}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
-                      {item.metadata.u_source_address}
+                      {item.u_source_address}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
-                      {item.metadata.u_destination_address}
+                      {item.u_destination_address}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
-                      {item.metadata.u_action}
+                      {item.u_action}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
-                      {item.metadata.u_requestor}
+                      {item.u_requestor}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
                       <button
@@ -116,14 +143,14 @@ function DataList({ onSelectRow }) {
                           e.stopPropagation();
                           handlePush(item);
                         }}
-                        disabled={loadingRow === item.metadata.u_change_id}
+                        disabled={loadingRow === item.u_change_id}
                         className={`px-4 py-2 text-sm font-semibold rounded-md ${
-                          loadingRow === item.metadata.u_change_id
+                          loadingRow === item.u_change_id
                             ? "bg-gray-300 cursor-not-allowed"
                             : "bg-indigo-600 hover:bg-indigo-700 text-white"
                         }`}
                       >
-                        {loadingRow === item.metadata.u_change_id
+                        {loadingRow === item.u_change_id
                           ? "Pushing..."
                           : "Push"}
                       </button>
