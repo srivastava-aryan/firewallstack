@@ -29,7 +29,12 @@ export default function ChatbotUI({ selectedMetadata }) {
       if (
         lowerInput.includes("policies in sync") ||
         lowerInput.includes("sync policies") ||
-        lowerInput.includes("are the policies in sync")
+        lowerInput.includes("are the policies in sync")||
+        lowerInput.includes("sync with servicenow")||
+        lowerInput.includes("sync now")|| 
+        lowerInput.includes("sync status")||  
+        lowerInput.includes("check policies sync")||
+        (lowerInput.includes("sync") && lowerInput.includes("policy"))
       ) {
         // Show initial status
         setMessages((prev) => [
